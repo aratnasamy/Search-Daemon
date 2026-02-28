@@ -1,0 +1,16 @@
+folders:
+  - path: ~/Documents/Indexed_Docs
+
+settings:
+  model: all-MiniLM-L6-v2   # any sentence-transformers model name
+  chunk_size: 1000            # characters per chunk
+  chunk_overlap: 200          # overlap between consecutive chunks
+  batch_size: 32              # number of chunks embedded per model call
+  extensions:
+    - .txt
+    - .md
+    - .rst
+    - .pdf
+    - .docx
+    - .pptx
+    - .xlsx
