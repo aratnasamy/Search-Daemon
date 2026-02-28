@@ -50,17 +50,17 @@ class ChromaStore:
 
     def delete_by_path(self, collection: chromadb.Collection, file_path: Path) -> None:
         path_str = str(file_path)
-        results = collection.get(where={"path": path_str}, include=[])
+        results = collection.get(where={"file_path": path_str}, include=[])
         ids = results.get("ids", [])
         if ids:
             collection.delete(ids=ids)
             logger.debug("Deleted %d chunks for %s", len(ids), file_path)
 
     def get_indexed_files(self, collection: chromadb.Collection) -> dict[str, float]:
-        """Return {path_str: mtime} for all indexed documents."""
+        """Return {path_str: mtime} for all indexed documents. Fallback for cache miss."""
         results = collection.get(include=["metadatas"])
         seen: dict[str, float] = {}
         for meta in results.get("metadatas") or []:
-            if meta and "path" in meta and "mtime" in meta:
-                seen[meta["path"]] = float(meta["mtime"])
+            if meta and "file_path" in meta and "mtime" in meta:
+                seen[meta["file_path"]] = float(meta["mtime"])
         return seen

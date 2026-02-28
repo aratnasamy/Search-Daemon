@@ -8,8 +8,10 @@ from pathlib import Path
 from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer, ObserverType
 
+from .cache import FileIndexCache
 from .config import Config, FolderConfig
 from .indexer import Indexer
+from .reindexer import pop_requests
 from .status import StatusTracker
 from .store import ChromaStore
 
@@ -51,7 +53,8 @@ def run_daemon(config: Config) -> None:
     store = ChromaStore()
     status = StatusTracker()
     status.start_heartbeat(interval=5.0)
-    indexer = Indexer(config, store, status=status)
+    cache = FileIndexCache()
+    indexer = Indexer(config, store, status=status, cache=cache)
 
     observers: list[ObserverType] = []
     stop_event = threading.Event()
@@ -73,6 +76,30 @@ def run_daemon(config: Config) -> None:
         obs.start()
         observers.append(obs)
         logger.info("Watching %s", folder.path)
+
+    # Build folder lookup for reindex requests
+    folder_map = {str(f.path): f for f in config.folders}
+
+    def _poll_reindex() -> None:
+        if stop_event.is_set():
+            return
+        for path_str in pop_requests():
+            folder = folder_map.get(path_str)
+            if folder:
+                logger.info("Force reindex requested for %s", path_str)
+                cache.invalidate(folder.path)
+                threading.Thread(
+                    target=indexer.initial_scan,
+                    args=(folder,),
+                    daemon=True,
+                ).start()
+            else:
+                logger.warning("Reindex request for unknown folder %s — ignoring", path_str)
+        t = threading.Timer(5.0, _poll_reindex)
+        t.daemon = True
+        t.start()
+
+    _poll_reindex()
 
     logger.info("Daemon running. Press Ctrl+C to stop.")
     stop_event.wait()

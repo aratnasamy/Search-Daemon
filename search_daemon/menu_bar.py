@@ -6,6 +6,8 @@ from pathlib import Path
 
 import rumps
 
+from .reindexer import request_reindex
+
 STATUS_PATH = Path("~/.cache/search-mcp/status.json").expanduser()
 STALE_SECONDS = 12
 
@@ -25,6 +27,12 @@ def _format_dt(iso: str | None) -> str:
         return dt.strftime("%-m/%-d %-I:%M %p")
     except ValueError:
         return iso
+
+
+def _make_reindex_callback(abs_path: str):
+    def _callback(_sender) -> None:
+        request_reindex(Path(abs_path))
+    return _callback
 
 
 def _folder_status_text(folder: dict) -> str:
@@ -79,6 +87,12 @@ class SearchDaemonApp(rumps.App):
                         sub = rumps.MenuItem(line)
                         sub.set_callback(None)
                         folder_item.add(sub)
+                    folder_item.add(rumps.separator)
+                    reindex_item = rumps.MenuItem(
+                        "Force Reindex",
+                        callback=_make_reindex_callback(abs_path),
+                    )
+                    folder_item.add(reindex_item)
                     items.append(folder_item)
 
         items.append(rumps.separator)
